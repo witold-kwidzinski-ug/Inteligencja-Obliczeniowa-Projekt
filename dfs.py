@@ -24,16 +24,10 @@ points = {
     4: [(1,3), (2, 0)],
     5: [(2,1), (2, 4)],
 }
-
-def print_puzzle(s):
-    for row in s:
-        print(row)
-    print()
-
 DIRECTIONS = [(1, 0), (0, -1), (-1, 0), (0, 1)]
 
 
-def dfs(s, cur, color):
+def dfs_alg(s, cur, color):
 
 
     if cur != points[color][0]:
@@ -43,7 +37,7 @@ def dfs(s, cur, color):
         if color + 1 == len(points) + 1:
             return True
 
-        return dfs(s, points[color + 1][0], color + 1)
+        return dfs_alg(s, points[color + 1][0], color + 1)
 
     dirs = DIRECTIONS[:]
     dirs.sort(key=lambda d: math.dist((cur[0] + d[0], cur[1] + d[1]), points[color][1]))
@@ -54,7 +48,7 @@ def dfs(s, cur, color):
             continue
 
         if next_step == points[color][1] or s[next_step[1]][next_step[0]] == 0:
-            if dfs(s, next_step, color):
+            if dfs_alg(s, next_step, color):
                 return True
     else:
         if (cur[0], cur[1]) != points[color][0] and (cur[0], cur[1]) != points[color][1]:
@@ -62,13 +56,6 @@ def dfs(s, cur, color):
         return False
 
 
+def dfs(s, p):
+    dfs_alg(s, p[1][0], 1)
 
-start = time.time()
-
-dfs(stage, points[1][0], 1)
-
-stop = time.time()
-
-print_puzzle(stage)
-
-print(stop-start)
