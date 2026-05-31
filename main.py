@@ -5,7 +5,7 @@ from maze_generator import maze_generator
 pg.init()
 
 screen = pg.display.set_mode((1280, 720))
-pg.display.set_caption('Numberlink+')
+pg.display.set_caption('Colorlink+')
 clock = pg.time.Clock()
 font = pg.font.SysFont('Comic Sans MS', 40)
 
@@ -375,7 +375,7 @@ while running:
 
         match game_state:
             case "menu":
-                show_text(640, 100, "black", "Numberlink+")
+                show_text(640, 100, "black", "Colorlink+")
                 solve_button.update(event.type)
                 create_button.update(event.type)
             case "solve":
