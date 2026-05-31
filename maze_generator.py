@@ -1,3 +1,4 @@
+import math
 import random
 from dfs import dfs
 
@@ -16,27 +17,32 @@ colors = {
 
 
 
-def maze_generator(width, height, color_amount):
-    maze = [[0 for _ in range(width)] for _ in range(height)]
+def maze_generator(size, color_amount):
+    maze = [[0 for _ in range(size)] for _ in range(size)]
 
     while True:
-        tmp = [j[:] for j in maze]
         used_points = {}
         for i in range(color_amount):
             used_points[i+1] = []
             valid = False
             while not valid:
-                start = (random.randint(0, width-1), random.randint(0, height-1))
-                end = (random.randint(0, width-1), random.randint(0, height-1))
-                if start not in used_points and end not in used_points:
+                start = (random.randint(0, size-1), random.randint(0, size-1))
+                end = (random.randint(0, size-1), random.randint(0, size-1))
+                for color in used_points:
+                    if start == end or math.dist(start, end) == 1 or start in used_points[color] or end in used_points[color]:
+                        break
+                else:
                     maze[start[1]][start[0]] = i + 1
                     maze[end[1]][end[0]] = i + 1
                     used_points[i+1].append(start)
                     used_points[i+1].append(end)
                     valid = True
-        print("Points found")
-        if dfs(tmp, used_points):
-            return tmp
+        board = dfs(size, used_points)
+        if board:
+            unused_points = []
+            for i in range(size):
+                for j in range(size):
+                    if board[i][j] == 0:
+                        unused_points.append((j, i))
 
-
-print(maze_generator(5,4,2))
+            return used_points, unused_points

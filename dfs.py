@@ -27,7 +27,7 @@ def can_reach(s, start, end):
             return True
 
         for dir in DIRECTIONS:
-            next = (x + dir[0], y+ dir[1])
+            next = (x + dir[0], y + dir[1])
 
             if next[0] < 0 or next[0] >= len(s[0]):
                 continue
@@ -44,32 +44,31 @@ def can_reach(s, start, end):
 
     return False
 
-# def print_puzzle(s):
-#     for row in s:
-#         print(row)
-#     print()
 
-
-def dfs_alg(s, cur, color, p):
+def dfs_alg(s, cur, color, p, vals):
     c = list(p.keys())[color]
-
-
-    if cur == p[c][0]:
-        if not can_reach(s, p[c][0], p[c][1]):
-            return False
-
-    if cur != p[c][0]:
-        s[cur[1]][cur[0]] = c
 
     if cur == p[c][1]:
         if color + 1 == len(p):
             return True
 
-        # print(f"{color+1}/{len(p)}")
-        return dfs_alg(s, p[list(p.keys())[color+1]][0], color + 1, p)
+        return dfs_alg(s, p[list(p.keys())[color+1]][0], color + 1, p, vals)
+
+
+    if cur != p[c][0]:
+        s[cur[1]][cur[0]] = c
+
+        if not can_reach(s, cur, p[c][1]):
+            s[cur[1]][cur[0]] = 0
+            return False
+
+        for i in range(color+1, len(vals)):
+            if not can_reach(s, vals[i][0], vals[i][1]):
+                s[cur[1]][cur[0]] = 0
+                return False
 
     dirs = DIRECTIONS[:]
-    dirs.sort(key=lambda d: math.dist((cur[0] + d[0], cur[1] + d[1]), p[c][1]))
+    dirs.sort(key=lambda d: abs(cur[0] + d[0] - p[c][1][0]) + abs(cur[1] + d[1] - p[c][1][1]))
 
     for dir in dirs:
         next_step = (cur[0] + dir[0], cur[1] + dir[1])
@@ -77,7 +76,7 @@ def dfs_alg(s, cur, color, p):
             continue
 
         if next_step == p[c][1] or s[next_step[1]][next_step[0]] == 0:
-            if dfs_alg(s, next_step, color, p):
+            if dfs_alg(s, next_step, color, p, vals):
                 return True
     else:
         if (cur[0], cur[1]) != p[c][0] and (cur[0], cur[1]) != p[c][1]:
@@ -113,7 +112,8 @@ def dfs(size, p):
     for col in sorted_p:
         sorted_p[col].sort(key=lambda point: count_obstacles(s, point), reverse=True)
 
+    vals = list(sorted_p.values())
 
-    if dfs_alg(s, sorted_p[list(sorted_p.keys())[0]][0], 0, sorted_p):
+    if dfs_alg(s, sorted_p[list(sorted_p.keys())[0]][0], 0, sorted_p, vals):
         return s
     return False

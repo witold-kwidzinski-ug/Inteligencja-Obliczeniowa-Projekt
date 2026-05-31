@@ -1,5 +1,6 @@
 import pygame as pg
 from dfs import dfs
+from maze_generator import maze_generator
 
 pg.init()
 
@@ -23,8 +24,8 @@ colors = {
 }
 
 
-def show_text(var, x, y, kolor, tekst=''): # funkcja pojazująca tekst na ekranie
-    vartext = font.render(f'{tekst}{var}', True, kolor)
+def show_text(x, y, kolor, tekst=''): # funkcja pojazująca tekst na ekranie
+    vartext = font.render(f'{tekst}', True, kolor)
     varrect = vartext.get_rect(center=(x,y))
     screen.blit(vartext,varrect)
 
@@ -54,7 +55,7 @@ class TextButton:
             pg.draw.rect(screen, tuple(x + y for x, y in zip(self.color, (10, 10, 10, 0))), self.rect, border_radius=20)
         else:
             pg.draw.rect(screen, self.color, self.rect, border_radius=20)
-        show_text("", self.text_rect[0], self.text_rect[1]-3, "white", self.text)
+        show_text(self.text_rect[0], self.text_rect[1]-3, "white", self.text)
 
 class Tile:
     def __init__(self, x, y, pos):
@@ -72,39 +73,44 @@ class Tile:
             pg.draw.circle(screen, pg.color.Color(80, 80, 80), [self.x, self.y], 22.5)
 
 class TileMap:
-    def __init__(self, size):
+    def __init__(self, size, top=150, left=100, unused_points=[]):
         self.tiles = [[] for _ in range(size)]
         self.center = (400, 250)
         self.size = size
 
-        tile_y = 150
+        tile_y = top
         for i in range(size):
-            tile_x = 100
+            tile_x = left
             row = self.tiles[i]
             for j in range(size):
-                row.append(Tile(tile_x, tile_y, (j, i)))
+                if not (int((tile_x-left) / 50), int((tile_y-top) / 50)) in unused_points:
+                    row.append(Tile(tile_x, tile_y, (j, i)))
+                else:
+                    row.append(None)
                 tile_x += 50
             tile_y += 50
 
     def update(self):
         for row in self.tiles:
             for col in row:
-                col.update()
+                if col is not None:
+                    col.update()
 
 class Node:
-    def __init__(self, color, init_x, init_y, node_mode):
+    def __init__(self, color, init_x, init_y, node_type):
         self.color = color
         self.init_coords = (init_x, init_y)
         self.x = init_x
         self.y = init_y
-        self.node_mode = node_mode
+        self.node_type = node_type
+        self.node_mode = "idle"
         self.rect = pg.rect.Rect(self.x - 45/2, self.y - 45/2, 45, 45)
 
     def reset_position(self):
         self.x = self.init_coords[0]
         self.y = self.init_coords[1]
         self.rect = pg.rect.Rect(self.x - 45 / 2, self.y - 45 / 2, 45, 45)
-        self.node_mode = "create"
+        self.node_mode = "idle"
 
     def above_tile(self):
         for row in create_tilemap.tiles:
@@ -120,30 +126,36 @@ class Node:
 
     def update(self, event):
         global selected_node, answer
-        if event == pg.MOUSEBUTTONDOWN:
-            if self.rect.collidepoint(pg.mouse.get_pos()):
-                if self.node_mode != "selected" and selected_node is None:
-                    self.node_mode = "selected"
-                    selected_node = self
-                    if answer != {}:
-                        answer = {}
-                else:
-                    if self.node_mode == "selected":
-                        tile = self.above_tile()
-                        if tile:
-                            self.node_mode = "idle"
-                            selected_node = None
-                            self.x, self.y = (tile.x, tile.y)
-                            self.rect = pg.rect.Rect(self.x - 45 / 2, self.y - 45 / 2, 45, 45)
-
+        match self.node_type:
+            case "create":
+                if event == pg.MOUSEBUTTONDOWN:
+                    if self.rect.collidepoint(pg.mouse.get_pos()):
+                        if self.node_mode != "selected" and selected_node is None:
+                            self.node_mode = "selected"
+                            selected_node = self
+                            if answer != {}:
+                                answer = {}
                         else:
-                            self.node_mode = "idle"
-                            selected_node = None
-                            self.x, self.y = self.init_coords
-                            self.rect = pg.rect.Rect(self.x - 45 / 2, self.y - 45 / 2, 45, 45)
-        if self.node_mode == "selected":
-            self.x, self.y = pg.mouse.get_pos()
-            self.rect = pg.rect.Rect(self.x - 45 / 2, self.y - 45 / 2, 45, 45)
+                            if self.node_mode == "selected":
+                                tile = self.above_tile()
+                                if tile:
+                                    self.node_mode = "idle"
+                                    selected_node = None
+                                    self.x, self.y = (tile.x, tile.y)
+                                    self.rect = pg.rect.Rect(self.x - 45 / 2, self.y - 45 / 2, 45, 45)
+
+                                else:
+                                    self.node_mode = "idle"
+                                    selected_node = None
+                                    self.x, self.y = self.init_coords
+                                    self.rect = pg.rect.Rect(self.x - 45 / 2, self.y - 45 / 2, 45, 45)
+                if self.node_mode == "selected":
+                    self.x, self.y = pg.mouse.get_pos()
+                    self.rect = pg.rect.Rect(self.x - 45 / 2, self.y - 45 / 2, 45, 45)
+            case "solve":
+                pass
+
+
         pg.draw.circle(screen, colors[self.color], [self.x, self.y], 22.5)
 
 
@@ -157,11 +169,15 @@ def change_game_state(state):
 
 
 def back():
-    global create_substate, create_nodes, answer, create_text
+    global create_substate, create_nodes, answer, create_text, solve_size, color_amount, solve_substate, solve_nodes
     change_game_state("menu")
     create_substate = "size"
+    solve_substate = "params"
     answer = {}
     create_text = ""
+    solve_size = 0
+    color_amount = 0
+    solve_nodes = []
     for node in create_nodes:
         node.reset_position()
 
@@ -187,7 +203,7 @@ create_points = {
 
 create_tilemap = TileMap(0)
 
-def choose_size(size):
+def create_choose_size(size):
     global create_tilemap, create_substate
     create_tilemap = TileMap(size)
     create_substate = "make"
@@ -236,12 +252,12 @@ def verify():
 
 
 verify_button = TextButton(640, 720, 150, 50, pg.color.Color(51, 43, 0), "Verify", lambda: verify())
-create_button_size_5x5 = TextButton(140, 360, 150, 50, pg.color.Color(20, 20, 20), "5x5", lambda: choose_size(5))
-create_button_size_6x6 = TextButton(340, 360, 150, 50, pg.color.Color(20, 20, 20), "6x6", lambda: choose_size(6))
-create_button_size_7x7 = TextButton(540, 360, 150, 50, pg.color.Color(20, 20, 20), "7x7", lambda: choose_size(7))
-create_button_size_8x8 = TextButton(740, 360, 150, 50, pg.color.Color(20, 20, 20), "8x8", lambda: choose_size(8))
-create_button_size_9x9 = TextButton(940, 360, 150, 50, pg.color.Color(20, 20, 20), "9x9", lambda: choose_size(9))
-create_button_size_10x10 = TextButton(1140, 360, 150, 50, pg.color.Color(20, 20, 20), "10x10", lambda: choose_size(10))
+create_button_size_5x5 = TextButton(140, 360, 150, 50, pg.color.Color(20, 20, 20), "5x5", lambda: create_choose_size(5))
+create_button_size_6x6 = TextButton(340, 360, 150, 50, pg.color.Color(20, 20, 20), "6x6", lambda: create_choose_size(6))
+create_button_size_7x7 = TextButton(540, 360, 150, 50, pg.color.Color(20, 20, 20), "7x7", lambda: create_choose_size(7))
+create_button_size_8x8 = TextButton(740, 360, 150, 50, pg.color.Color(20, 20, 20), "8x8", lambda: create_choose_size(8))
+create_button_size_9x9 = TextButton(940, 360, 150, 50, pg.color.Color(20, 20, 20), "9x9", lambda: create_choose_size(9))
+create_button_size_10x10 = TextButton(1140, 360, 150, 50, pg.color.Color(20, 20, 20), "10x10", lambda: create_choose_size(10))
 
 
 create_nodes = []
@@ -254,18 +270,57 @@ for i in range(len(colors)):
         node_init_x += 50
     node_init_y += 50
 
+
+
+
 ####Solve
 solve_size = 0
 color_amount = 0
 
-verify_button = TextButton(640, 720, 150, 50, pg.color.Color(51, 43, 0), "Generate", lambda: print("Generating"))
-solve_button_size_5x5 = TextButton(140, 360, 150, 50, pg.color.Color(20, 20, 20), "5x5", lambda: choose_size(5))
-solve_button_size_6x6 = TextButton(340, 360, 150, 50, pg.color.Color(20, 20, 20), "6x6", lambda: choose_size(6))
-solve_button_size_7x7 = TextButton(540, 360, 150, 50, pg.color.Color(20, 20, 20), "7x7", lambda: choose_size(7))
-solve_button_size_8x8 = TextButton(740, 360, 150, 50, pg.color.Color(20, 20, 20), "8x8", lambda: choose_size(8))
-solve_button_size_9x9 = TextButton(940, 360, 150, 50, pg.color.Color(20, 20, 20), "9x9", lambda: choose_size(9))
-solve_button_size_10x10 = TextButton(1140, 360, 150, 50, pg.color.Color(20, 20, 20), "10x10", lambda: choose_size(10))
+solve_tilemap = TileMap(0)
+solve_nodes = []
 
+def generate(s, c):
+    global solve_tilemap, solve_substate
+    solve_substate = "generated"
+    points = maze_generator(s, c)
+    solve_tilemap = TileMap(s, 235 - (s-5) * 25, 515 - (s-5) * 35, points[1])
+    print(points)
+    for color in points[0]:
+        p = points[0][color]
+        print(p)
+        start_tile = solve_tilemap.tiles[p[0][1]][p[0][0]]
+        end_tile = solve_tilemap.tiles[p[1][1]][p[1][0]]
+
+        solve_nodes.append(Node(color, start_tile.x, start_tile.y, "solve"))
+        solve_nodes.append(Node(color, end_tile.x, end_tile.y, "solve"))
+
+
+def solve_choose_size(s):
+    global solve_size
+    solve_size = s
+
+def solve_choose_color_amount(c):
+    global color_amount
+    color_amount = c
+
+
+generate_button = TextButton(640, 720, 150, 50, pg.color.Color(51, 43, 0), "Start", lambda: generate(solve_size, color_amount))
+solve_button_size_5x5 = TextButton(140, 300, 150, 50, pg.color.Color(20, 20, 20), "5x5", lambda: solve_choose_size(5))
+solve_button_size_6x6 = TextButton(340, 300, 150, 50, pg.color.Color(20, 20, 20), "6x6", lambda: solve_choose_size(6))
+solve_button_size_7x7 = TextButton(540, 300, 150, 50, pg.color.Color(20, 20, 20), "7x7", lambda: solve_choose_size(7))
+solve_button_size_8x8 = TextButton(740, 300, 150, 50, pg.color.Color(20, 20, 20), "8x8", lambda: solve_choose_size(8))
+solve_button_size_9x9 = TextButton(940, 300, 150, 50, pg.color.Color(20, 20, 20), "9x9", lambda: solve_choose_size(9))
+solve_button_size_10x10 = TextButton(1140, 300, 150, 50, pg.color.Color(20, 20, 20), "10x10", lambda: solve_choose_size(10))
+
+solve_color_3 = TextButton(80, 500, 150, 50, pg.color.Color(20, 20, 20), "3", lambda: solve_choose_color_amount(3))
+solve_color_4 = TextButton(240, 500, 150, 50, pg.color.Color(20, 20, 20), "4", lambda: solve_choose_color_amount(4))
+solve_color_5 = TextButton(400, 500, 150, 50, pg.color.Color(20, 20, 20), "5", lambda: solve_choose_color_amount(5))
+solve_color_6 = TextButton(560, 500, 150, 50, pg.color.Color(20, 20, 20), "6", lambda: solve_choose_color_amount(6))
+solve_color_7 = TextButton(720, 500, 150, 50, pg.color.Color(20, 20, 20), "7", lambda: solve_choose_color_amount(7))
+solve_color_8 = TextButton(880, 500, 150, 50, pg.color.Color(20, 20, 20), "8", lambda: solve_choose_color_amount(8))
+solve_color_9 = TextButton(1040, 500, 150, 50, pg.color.Color(20, 20, 20), "9", lambda: solve_choose_color_amount(9))
+solve_color_10 = TextButton(1200, 500, 150, 50, pg.color.Color(20, 20, 20), "10", lambda: solve_choose_color_amount(10))
 
 
 while True:
@@ -278,15 +333,43 @@ while True:
 
         match game_state:
             case "menu":
-                show_text("",640, 100, "black", "Numberlink+")
+                show_text(640, 100, "black", "Numberlink+")
                 solve_button.update(event.type)
                 create_button.update(event.type)
             case "solve":
                 back_button.update(event.type)
+                match solve_substate:
+                    case "params":
+                        show_text(640, 100, "black", "Choose params")
+                        if solve_size != 0:
+                            show_text(100, 640, "black", f"{solve_size}x{solve_size}")
+                        if color_amount != 0:
+                            show_text(100, 690, "black", f"{color_amount} colors")
+                        if solve_size != 0 and color_amount != 0:
+                            generate_button.update(event.type)
+                        solve_button_size_5x5.update(event.type)
+                        solve_button_size_6x6.update(event.type)
+                        solve_button_size_7x7.update(event.type)
+                        solve_button_size_8x8.update(event.type)
+                        solve_button_size_9x9.update(event.type)
+                        solve_button_size_10x10.update(event.type)
+
+                        solve_color_3.update(event.type)
+                        solve_color_4.update(event.type)
+                        solve_color_5.update(event.type)
+                        solve_color_6.update(event.type)
+                        solve_color_7.update(event.type)
+                        solve_color_8.update(event.type)
+                        solve_color_9.update(event.type)
+                        solve_color_10.update(event.type)
+                    case "generated":
+                        solve_tilemap.update()
+                        for node in solve_nodes:
+                            node.update(event.type)
             case "create":
                 match create_substate:
                     case "size":
-                        show_text("",640, 100, "black", "Pick size")
+                        show_text(640, 100, "black", "Pick size")
                         create_button_size_5x5.update(event.type)
                         create_button_size_6x6.update(event.type)
                         create_button_size_7x7.update(event.type)
@@ -302,12 +385,12 @@ while True:
                             pg.draw.circle(screen, pg.color.Color(40, 40, 40), node.init_coords, 22.5)
                         for node in create_nodes:
                             node.update(event.type)
-                        show_text("", 640, 50, "black", create_text)
+                        show_text(640, 50, "black", create_text)
                         if answer != {}:
                             for color in list(answer.keys()):
                                 for i in range(0, len(answer[color])-1):
                                     pg.draw.line(screen, colors[color], answer[color][i], answer[color][i+1], 10)
-            case "solve":
+
 
 
 
