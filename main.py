@@ -69,11 +69,11 @@ class Tile:
     def update(self):
         pg.draw.rect(screen, pg.color.Color(50, 50, 50), self.rect)
         pg.draw.rect(screen, pg.color.Color(10, 10, 10), self.rect, 2)
-        if self.rect.collidepoint(pg.mouse.get_pos()) and selected_node is not None:
+        if self.rect.collidepoint(pg.mouse.get_pos()) and selected_node is not None and game_state == "create":
             pg.draw.circle(screen, pg.color.Color(80, 80, 80), [self.x, self.y], 22.5)
 
 class TileMap:
-    def __init__(self, size, top=150, left=100, unused_points=[]):
+    def __init__(self, size, top=150, left=100):
         self.tiles = [[] for _ in range(size)]
         self.center = (400, 250)
         self.size = size
@@ -83,10 +83,7 @@ class TileMap:
             tile_x = left
             row = self.tiles[i]
             for j in range(size):
-                if not (int((tile_x-left) / 50), int((tile_y-top) / 50)) in unused_points:
-                    row.append(Tile(tile_x, tile_y, (j, i)))
-                else:
-                    row.append(None)
+                row.append(Tile(tile_x, tile_y, (j, i)))
                 tile_x += 50
             tile_y += 50
 
@@ -125,7 +122,7 @@ class Node:
             return False
 
     def update(self, event):
-        global selected_node, answer
+        global selected_node, answer, create_text, solve_cur, solve_connected_points
         match self.node_type:
             case "create":
                 if event == pg.MOUSEBUTTONDOWN:
@@ -135,6 +132,8 @@ class Node:
                             selected_node = self
                             if answer != {}:
                                 answer = {}
+                            if create_text != "":
+                                create_text = ""
                         else:
                             if self.node_mode == "selected":
                                 tile = self.above_tile()
@@ -153,7 +152,21 @@ class Node:
                     self.x, self.y = pg.mouse.get_pos()
                     self.rect = pg.rect.Rect(self.x - 45 / 2, self.y - 45 / 2, 45, 45)
             case "solve":
-                pass
+                if not puzzle_solved:
+                    if event == pg.MOUSEBUTTONDOWN and self.rect.collidepoint(pg.mouse.get_pos()):
+                        if selected_node is None:
+                            selected_node = self
+                            solve_cur = self.color
+                            if len(solve_connected_points[solve_cur]) != 0:
+                                solve_connected_points[solve_cur] = []
+                        elif selected_node is not self and selected_node.color == self.color and solve_connected_points[self.color][-1] == (self.x, self.y):
+                            print("connected!")
+                            solve_connected_points[solve_cur].append(self.init_coords)
+                            selected_node = None
+                            solve_cur = None
+                        else:
+                            selected_node = self
+
 
 
         pg.draw.circle(screen, colors[self.color], [self.x, self.y], 22.5)
@@ -169,7 +182,7 @@ def change_game_state(state):
 
 
 def back():
-    global create_substate, create_nodes, answer, create_text, solve_size, color_amount, solve_substate, solve_nodes
+    global create_substate, create_nodes, answer, create_text, solve_size, color_amount, solve_substate, solve_nodes, solve_connected_points, solve_points, selected_node, solve_cur
     change_game_state("menu")
     create_substate = "size"
     solve_substate = "params"
@@ -178,6 +191,11 @@ def back():
     solve_size = 0
     color_amount = 0
     solve_nodes = []
+    solve_connected_points = {}
+    solve_points = {}
+    selected_node = None
+    solve_cur = None
+    solve_nodes.clear()
     for node in create_nodes:
         node.reset_position()
 
@@ -279,21 +297,27 @@ color_amount = 0
 
 solve_tilemap = TileMap(0)
 solve_nodes = []
+solve_points = {}
 
 def generate(s, c):
-    global solve_tilemap, solve_substate
+    global solve_tilemap, solve_substate, solve_connected_points, puzzle_solved, solve_points
     solve_substate = "generated"
     points = maze_generator(s, c)
-    solve_tilemap = TileMap(s, 235 - (s-5) * 25, 515 - (s-5) * 35, points[1])
+    solve_tilemap = TileMap(s, 235 - (s-5) * 25, 515 - (s-5) * 35)
     print(points)
-    for color in points[0]:
-        p = points[0][color]
+    solve_points = points
+    for color in points:
+        p = points[color]
         print(p)
         start_tile = solve_tilemap.tiles[p[0][1]][p[0][0]]
         end_tile = solve_tilemap.tiles[p[1][1]][p[1][0]]
 
         solve_nodes.append(Node(color, start_tile.x, start_tile.y, "solve"))
         solve_nodes.append(Node(color, end_tile.x, end_tile.y, "solve"))
+    solve_connected_points = {}
+    puzzle_solved = False
+    for i in range(c):
+        solve_connected_points[i+1] = []
 
 
 def solve_choose_size(s):
@@ -322,10 +346,28 @@ solve_color_8 = TextButton(880, 500, 150, 50, pg.color.Color(20, 20, 20), "8", l
 solve_color_9 = TextButton(1040, 500, 150, 50, pg.color.Color(20, 20, 20), "9", lambda: solve_choose_color_amount(9))
 solve_color_10 = TextButton(1200, 500, 150, 50, pg.color.Color(20, 20, 20), "10", lambda: solve_choose_color_amount(10))
 
+solve_connected_points = {}
+on_tile = None
 
-while True:
+def draw_connections():
+    for col in list(solve_connected_points.keys()):
+        color = solve_connected_points[col]
+        if len(color) < 2:
+            continue
+        for p in range(len(color)-1):
+            pg.draw.line(screen, colors[col], color[p], color[p+1], 10)
+
+
+solve_cur = None
+
+puzzle_solved = False
+
+running = True
+
+while running:
     for event in pg.event.get():
         if event.type == pg.QUIT:
+            running = False
             pg.quit()
             break
 
@@ -337,7 +379,6 @@ while True:
                 solve_button.update(event.type)
                 create_button.update(event.type)
             case "solve":
-                back_button.update(event.type)
                 match solve_substate:
                     case "params":
                         show_text(640, 100, "black", "Choose params")
@@ -366,6 +407,78 @@ while True:
                         solve_tilemap.update()
                         for node in solve_nodes:
                             node.update(event.type)
+                        if solve_connected_points != {}:
+                            if not puzzle_solved:
+                                for c in solve_connected_points:
+                                    if len(solve_connected_points[c]) < 2:
+                                        break
+
+                                    tmp = solve_points[c][:]
+
+                                    if solve_connected_points[c][0][0] < solve_connected_points[c][1][0] and tmp[0][0] > tmp[1][0]:
+                                        tmp.reverse()
+                                    elif solve_connected_points[c][0][1] < solve_connected_points[c][1][1] and tmp[0][1] > tmp[1][1]:
+                                        tmp.reverse()
+                                    elif solve_connected_points[c][0][0] > solve_connected_points[c][1][0] and tmp[0][0] < tmp[1][0]:
+                                        tmp.reverse()
+                                    elif solve_connected_points[c][0][1] > solve_connected_points[c][1][1] and tmp[0][1] < tmp[1][1]:
+                                        tmp.reverse()
+
+                                    if solve_connected_points[c][0] != (515 - ((solve_size - 5) * 35) + 50 * tmp[0][0],
+                                                                        235 - ((solve_size - 5) * 25) + 50 * tmp[0][
+                                                                            1]) or solve_connected_points[c][
+                                        len(solve_connected_points[c]) - 1] != (
+                                    515 - ((solve_size - 5) * 35) + 50 * tmp[1][0],
+                                    235 - ((solve_size - 5) * 25) + 50 * tmp[1][1]):
+                                        print(c)
+                                        break
+                                else:
+                                    print("solved")
+                                    puzzle_solved = True
+                                    selected_node = None
+                                    solve_cur = None
+
+
+                                if selected_node is not None:
+                                    if solve_cur is not None and pg.mouse.get_pressed()[2]:
+                                        selected_node = None
+                                        solve_connected_points[solve_cur] = []
+                                        solve_cur = None
+                                    else:
+                                        for row in solve_tilemap.tiles:
+                                            for tile in row:
+                                                if tile.rect.collidepoint(pg.mouse.get_pos()) and on_tile != tile:
+                                                    on_tile = tile
+                                                    if (tile.x, tile.y) not in solve_connected_points[solve_cur]:
+                                                        if len(solve_connected_points[solve_cur]) == 0:
+                                                            solve_connected_points[solve_cur].append((tile.x, tile.y))
+                                                            print(solve_connected_points)
+                                                            break
+                                                        elif (tile.x+50, tile.y) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1] or (tile.x, tile.y+50) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1] or (tile.x-50, tile.y) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1] or (tile.x, tile.y-50) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1]:
+                                                            for node in solve_nodes:
+                                                                if node.color != solve_cur and node.init_coords == (tile.x, tile.y):
+                                                                    break
+                                                            else:
+                                                                for col in solve_connected_points:
+                                                                    if col != solve_cur and (tile.x, tile.y) in solve_connected_points[col]:
+                                                                        break
+                                                                else:
+                                                                    solve_connected_points[solve_cur].append((tile.x, tile.y))
+                                                                    print(solve_connected_points)
+                                                                    break
+                                                    elif (tile.x, tile.y) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-2]:
+                                                        print(solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1])
+                                                        solve_connected_points[solve_cur].pop()
+                                                        print(solve_connected_points)
+                                draw_connections()
+                            else:
+                                pg.draw.rect(screen, "white", pg.rect.Rect(0, 0, 1280, 720))
+                                show_text(640, 360, "black", "Solved!")
+
+                back_button.update(event.type)
+
+
+
             case "create":
                 match create_substate:
                     case "size":

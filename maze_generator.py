@@ -39,10 +39,5 @@ def maze_generator(size, color_amount):
                     valid = True
         board = dfs(size, used_points)
         if board:
-            unused_points = []
-            for i in range(size):
-                for j in range(size):
-                    if board[i][j] == 0:
-                        unused_points.append((j, i))
 
-            return used_points, unused_points
+            return used_points
