@@ -160,7 +160,6 @@ class Node:
                             if len(solve_connected_points[solve_cur]) != 0:
                                 solve_connected_points[solve_cur] = []
                         elif selected_node is not self and selected_node.color == self.color and solve_connected_points[self.color][-1] == (self.x, self.y):
-                            print("connected!")
                             solve_connected_points[solve_cur].append(self.init_coords)
                             selected_node = None
                             solve_cur = None
@@ -304,11 +303,9 @@ def generate(s, c):
     solve_substate = "generated"
     points = maze_generator(s, c)
     solve_tilemap = TileMap(s, 235 - (s-5) * 25, 515 - (s-5) * 35)
-    print(points)
     solve_points = points
     for color in points:
         p = points[color]
-        print(p)
         start_tile = solve_tilemap.tiles[p[0][1]][p[0][0]]
         end_tile = solve_tilemap.tiles[p[1][1]][p[1][0]]
 
@@ -430,10 +427,8 @@ while running:
                                         len(solve_connected_points[c]) - 1] != (
                                     515 - ((solve_size - 5) * 35) + 50 * tmp[1][0],
                                     235 - ((solve_size - 5) * 25) + 50 * tmp[1][1]):
-                                        print(c)
                                         break
                                 else:
-                                    print("solved")
                                     puzzle_solved = True
                                     selected_node = None
                                     solve_cur = None
@@ -452,7 +447,6 @@ while running:
                                                     if (tile.x, tile.y) not in solve_connected_points[solve_cur]:
                                                         if len(solve_connected_points[solve_cur]) == 0:
                                                             solve_connected_points[solve_cur].append((tile.x, tile.y))
-                                                            print(solve_connected_points)
                                                             break
                                                         elif (tile.x+50, tile.y) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1] or (tile.x, tile.y+50) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1] or (tile.x-50, tile.y) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1] or (tile.x, tile.y-50) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1]:
                                                             for node in solve_nodes:
@@ -464,12 +458,9 @@ while running:
                                                                         break
                                                                 else:
                                                                     solve_connected_points[solve_cur].append((tile.x, tile.y))
-                                                                    print(solve_connected_points)
                                                                     break
                                                     elif (tile.x, tile.y) == solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-2]:
-                                                        print(solve_connected_points[solve_cur][len(solve_connected_points[solve_cur])-1])
                                                         solve_connected_points[solve_cur].pop()
-                                                        print(solve_connected_points)
                                 draw_connections()
                             else:
                                 pg.draw.rect(screen, "white", pg.rect.Rect(0, 0, 1280, 720))
